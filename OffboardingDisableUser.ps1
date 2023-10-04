@@ -14,21 +14,23 @@ if (Test-Path $csvPath) {
 
     # Loop through each user in the CSV
     foreach ($user in $userList) {
-        $upn = $user.UPN  # UPN from the CSV
+        $logonname = $user.logonname  # Logonname from the CSV
 
         # Check if the user exists
-        $existingUser = Get-ADUser -Filter { (UserPrincipalName -eq $upn) } -ErrorAction SilentlyContinue
+        $existingUser = Get-ADUser -Filter { (SamAccountName -eq $logonname) } -ErrorAction SilentlyContinue
 
         if ($existingUser -ne $null) {
             try {
                 # Disable the user account
-                Disable-ADAccount -Identity $upn
+                Disable-ADAccount -Identity $logonname
 
                 # Move the user to the former employees OU
-                Move-ADObject -Identity $upn -TargetPath $ouPath -ErrorAction Stop
+                Move-ADObject -Identity $existingUser -TargetPath $ouPath -ErrorAction Stop
             } catch {
-                Write-Host "Error offboarding user '$upn': $_"
+                Write-Host "Error offboarding user '$logonname': $_"
             }
         } 
     }
+} else {
+    Write-Host "CSV file not found at $csvPath."
 }
