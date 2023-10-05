@@ -12,6 +12,9 @@ $apiEndpoint = "https://172.16.1.21/api/public/update_user"  # Updated API endpo
 # Bypass SSL/TLS certificate checks (for debugging/testing purposes)
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 
+# Specify the target OU for former employees
+$ouPath = "OU=Former Employees,DC=CDB,DC=lan"
+
 # Check if the CSV file exists
 if (Test-Path $csvPath) {
     # Read the CSV file
@@ -29,7 +32,10 @@ if (Test-Path $csvPath) {
                 # Disable the user account in Active Directory
                 Disable-ADAccount -Identity $logonname
 
-                Write-Host "User '$logonname' in Active Directory has been disabled."
+                # Move the disabled user to the "Former Employees" OU
+                Move-ADObject -Identity $existingUser -TargetPath $ouPath
+
+                Write-Host "User '$logonname' in Active Directory has been disabled and moved to '$ouPath'."
             } catch {
                 Write-Host "Error disabling user '$logonname' in Active Directory: $_"
             }
