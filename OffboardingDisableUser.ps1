@@ -7,13 +7,10 @@ $csvPath = "S:\Fileshare\HR\LeavingHires.csv"
 # Kasm Workspaces API credentials
 $apiKey = "7fUH9ZV9HvWv"
 $apiSecret = "Zb7iiChJVyFWNSuQwYdcAGHypV2oCU7g"
-$apiEndpoint = "https://172.16.1.21/api/public/update_user"  # Updated API endpoint URL for Kasm Workspaces
+$apiEndpoint = "https://172.16.1.21/api/public"  # Updated API endpoint URL for Kasm Workspaces
 
 # Bypass SSL/TLS certificate checks (for debugging/testing purposes)
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-
-# Specify the target OU for former employees
-$ouPath = "OU=Former Employees,DC=CDB,DC=lan"
 
 # Check if the CSV file exists
 if (Test-Path $csvPath) {
@@ -32,10 +29,7 @@ if (Test-Path $csvPath) {
                 # Disable the user account in Active Directory
                 Disable-ADAccount -Identity $logonname
 
-                # Move the disabled user to the "Former Employees" OU
-                Move-ADObject -Identity $existingUser -TargetPath $ouPath
-
-                Write-Host "User '$logonname' in Active Directory has been disabled and moved to '$ouPath'."
+                Write-Host "User '$logonname' in Active Directory has been disabled."
             } catch {
                 Write-Host "Error disabling user '$logonname' in Active Directory: $_"
             }
@@ -44,40 +38,58 @@ if (Test-Path $csvPath) {
         }
 
         # Check if the KasmID is not empty
-        if (![string]::IsNullOrWhiteSpace($user.KasmID)) {
-            # Create the user data for updating in Kasm Workspaces
-            $kasmUserParams = @{
-                "api_key" = $apiKey
-                "api_key_secret" = $apiSecret
-                "target_user" = @{
-                    "user_id" = $user.KasmID  # Include the KasmID
-                    "username" = $logonname  # Use the Logonname as the username
-                    "disabled" = $true       # Disable the user in Kasm Workspaces
-                }
-            }
-
-            # Convert the user data to JSON format
-            $kasmUserParamsJson = $kasmUserParams | ConvertTo-Json
-
+        if (![string]::IsNullOrWhiteSpace($logonname)) {
             try {
-                # Make the API request to update the user in Kasm Workspaces
-                $kasmHeaders = @{
-                    "Content-Type" = "application/json"
+                # Get the user information from Kasm Workspaces using the username
+                $kasmUserParams = @{
+                    "api_key" = $apiKey
+                    "api_key_secret" = $apiSecret
+                    "target_user" = @{
+                        "username" = $logonname  # Use the Logonname as the username
+                    }
                 }
-                $kasmResponse = Invoke-RestMethod -Uri $apiEndpoint -Method Post -Headers $kasmHeaders -Body $kasmUserParamsJson
 
-                # Check the Kasm Workspaces API response
-                if ($kasmResponse.user -ne $null) {
-                    Write-Host "Kasm Workspaces account for user '$logonname' (KasmID: $($user.KasmID)) has been disabled."
+                # Convert the user data to JSON format
+                $kasmUserParamsJson = $kasmUserParams | ConvertTo-Json
+
+                $getUserResponse = Invoke-RestMethod -Uri "$apiEndpoint/get_user" -Method Post -Headers @{ "Content-Type" = "application/json" } -Body $kasmUserParamsJson
+
+                if ($getUserResponse.user -ne $null) {
+                    # Retrieve the KasmID from the Kasm Workspaces response
+                    $kasmID = $getUserResponse.user.user_id
+
+                    # Create the user data for updating in Kasm Workspaces
+                    $kasmUserUpdateParams = @{
+                        "api_key" = $apiKey
+                        "api_key_secret" = $apiSecret
+                        "target_user" = @{
+                            "user_id" = $kasmID
+                            "username" = $logonname  # Use the Logonname as the username
+                            "disabled" = $true       # Disable the user in Kasm Workspaces
+                        }
+                    }
+
+                    # Convert the user update data to JSON format
+                    $kasmUserUpdateParamsJson = $kasmUserUpdateParams | ConvertTo-Json
+
+                    # Make the API request to update the user in Kasm Workspaces
+                    $kasmUpdateResponse = Invoke-RestMethod -Uri "$apiEndpoint/update_user" -Method Post -Headers @{ "Content-Type" = "application/json" } -Body $kasmUserUpdateParamsJson
+
+                    # Check the Kasm Workspaces API response
+                    if ($kasmUpdateResponse.user -ne $null) {
+                        Write-Host "Kasm Workspaces account for user '$logonname' (KasmID: $kasmID) has been disabled."
+                    } else {
+                        # Print the API response for debugging purposes
+                        Write-Host "Kasm Workspaces API Response: $kasmUpdateResponse"
+
+                        # Handle the error when the user is not found in Kasm Workspaces
+                        Write-Host "User '$logonname' not found in Kasm Workspaces."
+                    }
                 } else {
-                    # Print the API response for debugging purposes
-                    Write-Host "Kasm Workspaces API Response: $kasmResponse"
-
-                    # Handle the error when the user is not found in Kasm Workspaces
                     Write-Host "User '$logonname' not found in Kasm Workspaces."
                 }
             } catch {
-                Write-Host "Error disabling Kasm Workspaces account for user '$logonname' (KasmID: $($user.KasmID)): $_"
+                Write-Host "Error retrieving or disabling Kasm Workspaces account for user '$logonname': $_"
             }
         }
     }
