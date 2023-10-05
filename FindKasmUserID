@@ -1,0 +1,64 @@
+# Define the path to the CSV file containing user information
+$csvPath = "S:\Fileshare\HR\LeavingHires.csv"
+
+# Kasm Workspaces API credentials
+$apiKey = "7fUH9ZV9HvWv"
+$apiSecret = "Zb7iiChJVyFWNSuQwYdcAGHypV2oCU7g"
+$apiEndpoint = "https://172.16.1.21/api/public/get_user"  # Updated API endpoint URL
+
+# Bypass SSL/TLS certificate checks (for debugging/testing purposes)
+[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+
+# Check if the CSV file exists
+if (Test-Path $csvPath) {
+    # Read the CSV file
+    $userList = Import-Csv $csvPath
+
+    # Loop through each user in the CSV
+    foreach ($user in $userList) {
+        $username = $user.logonname  # Username from the CSV
+
+        # Create the user data for retrieving from Kasm Workspaces
+        $kasmUserParams = @{
+            "api_key" = $apiKey
+            "api_key_secret" = $apiSecret
+            "target_user" = @{
+                "username" = $username
+            }
+        }
+
+        # Convert the user data to JSON format
+        $kasmUserParamsJson = $kasmUserParams | ConvertTo-Json
+
+        try {
+            # Make the API request to retrieve user information from Kasm Workspaces
+            $kasmHeaders = @{
+                "Content-Type" = "application/json"
+            }
+            $kasmResponse = Invoke-RestMethod -Uri $apiEndpoint -Method Post -Headers $kasmHeaders -Body $kasmUserParamsJson
+
+            # Check if the response contains user information
+            if ($kasmResponse.user -ne $null) {
+                Write-Host "User information for '$username':"
+                Write-Host "User ID: $($kasmResponse.user.user_id)"
+                Write-Host "Username: $($kasmResponse.user.username)"
+                Write-Host "Locked: $($kasmResponse.user.locked)"
+                Write-Host "Last Session: $($kasmResponse.user.last_session)"
+                # Add more properties as needed
+            }
+            else {
+                # Print the API response for debugging purposes
+                Write-Host "Kasm Workspaces API Response: $kasmResponse"
+
+                # Handle the case when the user is not found in Kasm Workspaces
+                Write-Host "User '$username' not found in Kasm Workspaces."
+            }
+        }
+        catch {
+            Write-Host "Error retrieving user information for '$username': $_"
+        }
+    }
+}
+else {
+    Write-Host "CSV file not found at $csvPath."
+}
