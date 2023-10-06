@@ -1,0 +1,50 @@
+# Kasm Workspaces API credentials
+$apiKey = "7fUH9ZV9HvWv"
+$apiSecret = "Zb7iiChJVyFWNSuQwYdcAGHypV2oCU7g"
+$apiEndpoint = "https://172.16.1.21/api/public"  # Updated API endpoint URL for Kasm Workspaces
+
+# Bypass SSL/TLS certificate checks (for debugging/testing purposes)
+[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+
+try {
+    # Specify the target user's user_id or username
+    $targetUser = @{
+        "user_id" = "fd0f4917eb38403f97f65f8fe7089302"  # Replace with the user_id or username you want to retrieve
+    }
+
+    # Create the API request to get user information
+    $getUserParams = @{
+        "api_key" = $apiKey
+        "api_key_secret" = $apiSecret
+        "target_user" = $targetUser
+    }
+
+    # Convert the request data to JSON format
+    $getUserParamsJson = $getUserParams | ConvertTo-Json
+
+    # Make the API request to retrieve user information
+    $getUserResponse = Invoke-RestMethod -Uri "$apiEndpoint/get_user" -Method Post -Headers @{ "Content-Type" = "application/json" } -Body $getUserParamsJson
+
+    # Check the API response for user information
+    if ($getUserResponse.user -ne $null) {
+        Write-Host "User ID: $($getUserResponse.user.user_id)"
+        Write-Host "Username: $($getUserResponse.user.username)"
+        Write-Host "Locked: $($getUserResponse.user.locked)"
+        Write-Host "Last Session: $($getUserResponse.user.last_session)"
+        Write-Host "Groups:"
+
+        # Iterate through user's groups and print their names and group IDs
+        foreach ($group in $getUserResponse.user.groups) {
+            Write-Host "  Group Name: $($group.name)"
+            Write-Host "  Group ID: $($group.group_id)"
+        }
+
+        # Print other user properties as needed
+        # ...
+
+    } else {
+        Write-Host "User not found in Kasm Workspaces."
+    }
+} catch {
+    Write-Host "Error retrieving user information from Kasm Workspaces: $_"
+}
