@@ -4,8 +4,10 @@ Import-Module ActiveDirectory
 # Define the path to the CSV file containing user information
 $csvPath = "S:\Fileshare\HR\LeavingHires.csv"
 
-# Load the API Key and Secret from the config file
+# Define the path to the config file
 $configPath = "C:\offboardingconfig.json"
+
+# Check if the config file exists
 if (Test-Path $configPath) {
     $configData = Get-Content $configPath | ConvertFrom-Json
     $apiKey = $configData.apiKey
@@ -15,8 +17,8 @@ if (Test-Path $configPath) {
     exit
 }
 
-# Bypass SSL/TLS certificate checks (for debugging/testing purposes)
-[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+# Define the Kasm Workspaces API endpoint URL
+$apiEndpoint = "https://172.16.1.21/api/public"  # Replace with the correct API endpoint URL
 
 # Specify the target OU for former employees
 $ouPath = "OU=Former Employees,DC=CDB,DC=lan"
